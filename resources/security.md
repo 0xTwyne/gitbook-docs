@@ -1,5 +1,7 @@
 # Security
 
+All our upgrades go through audits and are covered under Immunefi bug bounty.
+
 ### Audits
 
 #### Euler Integration
@@ -10,9 +12,17 @@
 #### Aave Integration
 
 * yAudit: [report 1](https://reports.yaudit.dev/2025-11-Twyne-AAVE) and [report 2](https://reports.yaudit.dev/2025-12-Twyne-AAVE-Operators)
-* [Josselin Feist](https://seceureka.com/):
+* [Josselin Feist](https://seceureka.com/) (SecEureka) review after yAudit fixes:
 
 {% file src="../.gitbook/assets/Twyne - Aave integration (1).pdf" %}
+
+### Dynamic Liquidation Incentive <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
+
+* [Josselin Feist](https://seceureka.com/) (SecEureka):
+
+{% file src="../.gitbook/assets/Twyne - Dynamic liquidation incentive.pdf" %}
+
+* yAudit review after SecEureka fixes: report soon.
 
 ### Bug Bounty with Immunefi <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
 
