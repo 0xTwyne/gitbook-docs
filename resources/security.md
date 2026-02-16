@@ -24,7 +24,7 @@ All our upgrades go through audits and are covered under Immunefi bug bounty.
 
 {% file src="../.gitbook/assets/Twyne - Dynamic liquidation incentive.pdf" %}
 
-* yAudit review: report soon.
+* yAudit: [report](https://reports.yaudit.dev/2025-12-Twyne-liquidation-incentive).
 
 ### Bug Bounty with Immunefi <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
 
