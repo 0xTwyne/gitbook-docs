@@ -16,7 +16,7 @@ All our upgrades go through audits and are covered under Immunefi bug bounty.
 
 {% file src="../.gitbook/assets/Twyne - Aave integration (1).pdf" %}
 
-* Engima dark: report soon
+* Engima dark: fuzzing [report 1](https://github.com/Enigma-Dark/security-review-reports/blob/main/2025-11_Invariant_Testing_Engagement_Twyne_Aave_integration.pdf) and [report 2](https://github.com/Enigma-Dark/security-review-reports/blob/main/2025-11_Invariant_Testing_Engagement_Twyne_Aave_atokenwrapper.pdf)
 
 ### Dynamic Liquidation Incentive <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
 
