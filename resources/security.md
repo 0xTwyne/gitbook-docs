@@ -18,7 +18,7 @@ All our upgrades go through audits and are covered under Immunefi bug bounty.
 
 * Engima dark: fuzzing [report 1](https://github.com/Enigma-Dark/security-review-reports/blob/main/2025-11_Invariant_Testing_Engagement_Twyne_Aave_integration.pdf) and [report 2](https://github.com/Enigma-Dark/security-review-reports/blob/main/2025-11_Invariant_Testing_Engagement_Twyne_Aave_atokenwrapper.pdf)
 
-### Dynamic Liquidation Incentive <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
+#### Dynamic Liquidation Incentive <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
 
 * Josselin Feist (SecEureka):
 
@@ -26,10 +26,11 @@ All our upgrades go through audits and are covered under Immunefi bug bounty.
 
 * yAudit: [report](https://reports.yaudit.dev/2025-12-Twyne-liquidation-incentive).
 
+#### Dynamic LLTV (soon) <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
+
+* yAudit: report.
+* Josselin Feist (SecEureka):
+
 ### Bug Bounty with Immunefi <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
 
 All details here: [immunefi.com/bug-bounty/twyne](https://immunefi.com/bug-bounty/twyne/).
-
-### Reporting security vulnerabilities <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
-
-If you believe you have found a security issue in Twyne smart contracts, please email [security@twyne.xyz](mailto:security@twyne.xyz) and follow the guidelines on our [security page](https://twyne.xyz/security/).
