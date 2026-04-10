@@ -1,6 +1,6 @@
 # IRM
 
-The Twyne IRM implements a curved interest rate model used by the credit vaults. This is unlike many other lending markets that use a more simple two-piece linear kink model. In the Twyne IRM, the interest rate growth is smoother but retains a similar design to the two-piece linear kink model. The Twyne IRM contract uses a very similar layout as, and is interchangeable/compatible with, the Euler Finance [IRMLinearKink](https://github.com/euler-xyz/euler-vault-kit/blob/master/src/InterestRateModels/IRMLinearKink.sol) contract.
+The Twyne IRM implements a curved interest rate model used by the credit vaults. This is unlike many other lending markets that use a more simple two-piece linear kink model. In the Twyne IRM, the interest rate growth is smoother but retains a similar design to the two-piece linear kink model. The Twyne IRM contract uses a very similar layout as, and is compatible with the Euler Finance [IRMLinearKink](https://github.com/euler-xyz/euler-vault-kit/blob/master/src/InterestRateModels/IRMLinearKink.sol) contract.
 
 ### Function Calls <a href="#function-calls" id="function-calls"></a>
 

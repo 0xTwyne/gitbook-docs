@@ -82,7 +82,7 @@ def has_non_negative_excess_credit(total_assets, user_collateral, twyne_liq_ltv,
     excess_credit = total_assets - calculated_max_collateral
 
     # Check if excess credit is non-negative
-    is_valid = excess_credit => 0
+    is_valid = excess_credit >= 0
 
     return {
         "is_valid": is_valid,

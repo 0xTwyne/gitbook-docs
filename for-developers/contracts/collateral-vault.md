@@ -1,8 +1,11 @@
 # Collateral Vault
 
-This contract is the collateral vault contract that all borrowers on Twyne interact with. In Twyne v1, every collateral vault has a single owner. Many functions in the collateral vault can be called only by the vault owner. This limits the ability for anyone else to interact with the vault, enhancing the security of the user’s collateral assets.
+This is the contract that every borrower on Twyne interacts with directly. Each collateral vault has a single borrower, and most state-changing functions are gated on that borrower. The vault is neither ERC20- nor ERC4626-compliant; correctness is enforced through Twyne's invariants (see the [tech overview](../../tech-overview/protocol-invariants/)).
 
-It isn’t ERC20 or ERC4626 compliant, partially the current design requires a single owner of vault value, meaning the vault shares must be non-transferrable. Correctness is maintained through our invariants, explained in more detail in the mechanics section.
+* `AaveV3CollateralVault` — borrows from the Aave V3 Pool using an Aave aToken wrapper (e.g. `aWETHWrapper`) as collateral asset. eMode is configured via `CollateralVaultFactory`.
+* `EulerCollateralVault` — borrows from an Euler V2 eVault using the corresponding eToken as collateral asset.
+
+The `CollateralVaultFactory` picks the right implementation based on the `VaultType` passed to `createCollateralVault`.
 
 ## Function Calls <a href="#function-calls" id="function-calls"></a>
 
@@ -10,118 +13,131 @@ Borrowers can deposit and withdraw collateral, borrow and repay their debt from 
 
 ### Deposit collateral <a href="#deposit-collateral" id="deposit-collateral"></a>
 
-Euler collateral vaults have assets like eWETH (yield bearing, Euler wrapped WETH) as collateral. To deposit these assets, use:
+To deposit the vault's collateral asset (e.g. `aWETHWrapper`, `eWETH`):
 
 ```solidity
-/// @notice Deposits a certain amount of assets for a receiver.
-/// @param assets The assets to deposit.
+/// @notice Deposits a certain amount of the vault's collateral asset.
 function deposit(uint assets) external;
 ```
 
-To deposit the underlying asset (like WETH), use:
+To deposit the underlying of the collateral asset (e.g. WETH) and let the vault handle wrapping:
 
 ```solidity
-/// @notice Deposits a certain amount of underlying asset for a receiver.
-/// @param underlying The underlying assets to deposit.
+/// @notice Deposits a certain amount of the underlying of the collateral asset.
+///         The vault wraps it (through aWETHWrapper / EVK) before crediting the position.
 function depositUnderlying(uint underlying) external;
 ```
 
-This function first trasfers the underlying asset, converts it to the corresponding Euler wrapped asset and then registers it as collateral.
+There is also a `skim()` hook used by the 1-click leverage flow:
+
+```solidity
+/// @notice Reconcile airdropped collateral asset sitting in the vault into the accounted position.
+/// @dev The leverage operator deposits into the wrapper with the collateral vault as the recipient,
+///      then calls skim() inside the borrower's EVC batch so the balance is recognized.
+function skim() external;
+```
 
 ### Withdraw collateral <a href="#withdraw-collateral" id="withdraw-collateral"></a>
 
-To withdraw your collateral, use:
+To withdraw the collateral asset:
 
 ```solidity
-/// @notice Withdraws a certain amount of assets for a receiver.
-/// @param assets Amount of collateral assets to withdraw.
-/// @param receiver The receiver of the withdrawal.
-function withdraw(uint assets, address receiver) external
+/// @notice Withdraws the collateral asset to a receiver.
+/// @param assets Amount of collateral assets to withdraw. Use type(uint).max to withdraw maximum.
+/// @param receiver Recipient of the collateral asset.
+function withdraw(uint assets, address receiver) external;
 ```
 
-In case you want to receive the underlying asset, use:
+To withdraw the underlying of the collateral asset (e.g. unwrap `aWETHWrapper` → `WETH` in the same call):
 
 ```solidity
-/// @notice Withdraw a certain amount of collateral and transfers collateral asset's underlying asset to receiver.
-/// @param assets Amount of collateral asset to withdraw.
-/// @param receiver The receiver of the redemption.
-/// @return underlying Amount of underlying asset transferred.
+/// @notice Withdraws collateral and redeems it into the underlying asset before transferring.
+/// @param assets Amount of collateral asset to burn (not the underlying amount).
+/// @param receiver Recipient of the underlying.
+/// @return underlying Amount of underlying sent to the receiver.
 function redeemUnderlying(uint assets, address receiver) external returns (uint underlying);
 ```
 
-Note that, you still specify the amount of collateral (which is eWETH in our running example). The contract will remove that amount as collateral, convert it to the underlying asset, and transfer all the redeemed underlying asset to `receiver`.
+### Borrow / repay target asset <a href="#borrow" id="borrow"></a>
 
-### Borrow <a href="#borrow" id="borrow"></a>
-
-Each collateral vault can only borrow a single asset called _target asset_. To borrow that target asset, use:
+Each collateral vault borrows a single fixed target asset.
 
 ```solidity
-/// @notice Borrows target assets from the external lending protocol
-/// @dev This function calls the internal _borrow function to handle the protocol-specific borrow logic,
-/// then transfers the target asset from the vault to _receiver.
-/// @param _targetAmount The amount of target asset to borrow
-/// @param _receiver The receiver of the borrowed assets
+/// @notice Borrows the target asset from the external lending protocol.
+/// @param _targetAmount Amount of target asset to borrow.
+/// @param _receiver Address that receives the borrowed asset.
 function borrow(uint _targetAmount, address _receiver) external;
-```
 
-### Repay <a href="#repay" id="repay"></a>
-
-```solidity
-/// @notice Repays debt owed to the external lending protocol
-/// @dev If _amount is set to type(uint).max, the entire debt will be repaid
-/// @dev This function transfers the target asset from the caller to the vault, then
-/// calls the internal _repay function to handle the protocol-specific repayment logic
-/// @dev Reverts if attempting to repay more than the current debt
-/// @param _amount The amount of targe asset to repay, or type(uint).max for full repayment
+/// @notice Repays target asset debt to the external lending protocol.
+/// @dev Passing type(uint).max repays everything owed.
 function repay(uint _amount) external;
 ```
 
-### Liquidate <a href="#liquidate" id="liquidate"></a>
+After every operation, the vault re-runs `_handleExcessCredit(_invariantCollateralAmount())` to reserve/release credit so the ideal amount of credit is reserved.
 
-Liquidating a collateral vault is a multi-step process.
+### Adjust the liquidation LTV <a href="#twyne-liqltv" id="twyne-liqltv"></a>
 
-1.  Call `liquidate()` which sets the collateral vault’s `borrower` variable to the caller:
+```solidity
+/// @notice Set this vault's liquidation LTV (1e4 precision).
+/// @dev The new LTV must satisfy externalLiqLTV * buffer <= newLTV * 1e4 <= maxTwyneLTV * 1e4
+function setTwyneLiqLTV(uint _ltv) external;
+```
 
-    ```solidity
-    /// @notice Begin the liquidation process for this vault.
-    /// @dev Liquidation needs to be done in a batch.
-    /// If the vault is liquidatable, this fn makes liquidator the new borrower.
-    /// Liquidator is then responsible to make this position healthy.
-    /// Liquidator may choose to wind down the position and take collateral as profit.
-    function liquidate() external;
-    ```
+Raising `twyneLiqLTV` automatically reserves more credit; lowering it releases credit back to the intermediate vault.
 
-    This essentially transfers the entire position from the borrower to the liquidator, hence liquidator becomes the new borrower.
-2. In the same batch, the liquidator has to make the position healthy, either by depositing more collateral, repaying some debt, or both.
-3. The liquidator will likely unwind the position completely for profit, but it isn’t mandated by the protocol.
+### Rebalance <a href="#rebalance" id="rebalance"></a>
+
+Over time interest accrual can leave a vault holding more reserved credit than the invariant requires. Anyone can trigger the release:
+
+```solidity
+/// @notice Returns the amount of excess credit that could be released right now. Reverts if none.
+function canRebalance() external view returns (uint);
+
+/// @notice Release excess credit back to the intermediate vault.
+/// @dev Permissionless — any caller can trigger it.
+function rebalance() external;
+```
+
+See the [rebalance logic](../../tech-overview/rebalance-logic.md) page for details.
+
+### Liquidate (inheritance) <a href="#liquidate" id="liquidate"></a>
+
+Twyne uses liquidation by inheritance. Liquidation is a multi-step flow that must happen inside a single EVC batch:
+
+1. Call `liquidate()`. If the position is liquidatable the liquidator becomes the new `borrower` of the vault; the previous borrower receives `collateralForBorrower(B, C)` worth of the collateral asset (paid at the end of the batch as part of `checkVaultStatus`). `B`, `C` represent the value of debt and user collateral in some common unit of account.
+
+   ```solidity
+   /// @notice Begin liquidation. Must be followed by actions that restore vault health in the same batch.
+   function liquidate() external;
+   ```
+2. Still inside the same batch, restore health by depositing more collateral and/or repaying debt.
+3. A just-in-time liquidator will typically repay everything and withdraw the remaining collateral as profit — but the protocol does not force them to unwind.
+
+The actual split between liquidator and liquidated borrower is computed by `collateralForBorrower(B, C)` in `CollateralVaultBase`, following the dynamic-incentive model described in the [liquidation logic](../../tech-overview/liquidation-logic/) pages.
 
 ### Handle external liquidation <a href="#handle-external-liquidation" id="handle-external-liquidation"></a>
 
-Collateral vault is a borrower w.r.t. external lending protocol. In case, the liquidation doesn’t happen on Twyne and the external debt position keeps deteriorating, the external lending protocol will liquidate the collateral vault.
-
-Once this happens, the following function needs to be called to process this external liquidation on that collateral vault:
+From the external lending market's point of view, the collateral vault is the borrower. If Twyne liquidators fail to act in time and the external market liquidates the vault, all the operations on the collateral vault become inaccessible except `handleExternalLiquidation()` which accounts for the leftover assets:
 
 ```solidity
-/// @notice Handles the aftermath of an external liquidation by the underlying lending protocol
-/// @dev Called when the vault's collateral was liquidated by the external protocol (e.g., Euler)
-/// @dev Steps performed:
-/// 1. Calculate and distribute the remaining collateral in this vault among
-///  the liquidator, borrower and intermediate vault
-/// 2. Repay remaining external debt using funds from the liquidator
-/// 3. Reset the vault state so that it cannot be used again
-/// @dev Can only be called when the vault is actually in an externally liquidated state
-/// @dev Caller needs to call intermediateVault.liquidate(collateral_vault_address, collateral_vault_address, 0, 0)
-/// in the same EVC batch if there is any bad debt left at the end of this call
-/// @dev Implementation varies depending on the external protocol integration
-function handleExternalLiquidation() external virtual;
+/// @notice Handles the aftermath of an external liquidation by the underlying lending protocol.
+/// @dev Distributes any remaining collateral between the liquidator (caller), the borrower, and the
+///      intermediate vault, repays any residual external debt, and shuts the vault down.
+/// @dev Caller must in the same EVC batch call
+///      `intermediateVault.liquidate(collateral_vault, collateral_vault, 0, 0)`
+///      if any bad debt remains afterwards.
+function handleExternalLiquidation() external;
 ```
 
-In a nutshell, this process unwinds the entire position, distributes the collateral asset balance of the collateral vault among relevant parties, and then shuts down.
+For Aave V3, `handleExternalLiquidation`:
 
-In some cases, this process may be create some bad debt for the intermediate vault as described as the exception scenario in [credit vault doc](https://twyne-tech-docs.onrender.com/developers/Twyne_Collateral_Vault/Credit_Vault.md#the-exception-scenario).
+1. Reconciles the wrapper accounting by burning wrapper shares equal to the amount Aave already seized.
+2. Uses Aave's oracles plus Twyne's `maxTwyneLTVs` to split the remaining collateral into three buckets: `C_LP` (returned to the intermediate vault), `borrowerClaim` (returned to the original borrower), and `liquidatorReward` (sent to the liquidator).
+3. Pulls target asset from the liquidator to repay any residual Aave debt.
+4. Transfers each bucket out and resets vault state.
 
-To settle the bad debt, call `intermediateVault.liquidate(...)` as follows:
+If after step 4 the intermediate vault still records a debt against this collateral vault (bad debt), the caller must settle it in the same batch with:
 
 ```solidity
-liquidate(collateral_vault_address, collateral_vault_address, 0, 0);
+intermediateVault.liquidate(collateral_vault, collateral_vault, 0, 0);
 ```

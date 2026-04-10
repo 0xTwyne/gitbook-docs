@@ -12,7 +12,7 @@ How much can be borrowed and reserved depends on our invariants. The key require
 
 A collateral vault can also be liquidated:
 
-* Liquidated by Twyne
+* Liquidated through Twyne
 * Externally liquidated (on the external lending protocol)
 
 Collateral vault can also be _rebalanced_. This is an action of releasing excess credit back to the intermediate vault. Further details on how rebalancing works [are in the mechanics section](../../tech-overview/rebalance-logic.md).

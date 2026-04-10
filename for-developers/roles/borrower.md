@@ -8,43 +8,48 @@ A borrower must first create a collateral vault. Once the vault exists, a borrow
 
 ### Creating the vault <a href="#creating-the-vault" id="creating-the-vault"></a>
 
-A borrower must call the `createCollateralVault(...)` function of the CollateralVaultFactory in order to create a collateral vault. The call can happen through the EVC (inside of an [EVC batch](https://github.com/euler-xyz/ethereum-vault-connector/blob/master/docs/whitepaper.md#batch)) or with a direct call to the factory. The collateral asset, borrowed asset, and Twyne LTV should all be specified at the time of vault creation.
+A borrower calls `createCollateralVault(...)` on the `CollateralVaultFactory` to deploy a new collateral vault. The call can happen directly or inside an [EVC batch](https://github.com/euler-xyz/ethereum-vault-connector/blob/master/docs/whitepaper.md#batch) — the latter lets you bundle vault creation with the first deposit and borrow.
 
 ```solidity
-/// @notice This function is called when a borrower wants to deploy a new collateral vault.
-/// @param _asset address of vault asset
-/// @param _targetVault address of the target vault, used for the lookup of the beacon proxy implementation contract
-/// @param _liqLTV user-specified target LTV
+enum VaultType { EULER_V2, AAVE_V3 }
+
+/// @notice Deploy a new collateral vault.
+/// @param _vaultType EULER_V2 or AAVE_V3
+/// @param _intermediateVault address of the intermediate vault the new collateral vault will reserve credit from
+/// @param _targetVault address of the external lending protocol's target (e.g., the Aave V3 Pool)
+/// @param _liqLTV borrower's chosen liquidation LTV in 1e4 precision
+/// @param _targetAsset asset to borrow from the target vault (e.g., USDC). Ignored for EULER_V2 but must be passed.
 /// @return vault address of the newly created collateral vault
-function createCollateralVault(address _asset, address _targetVault, uint _liqLTV)
-    external
-    returns (address vault);
+function createCollateralVault(
+    VaultType _vaultType,
+    address _intermediateVault,
+    address _targetVault,
+    uint _liqLTV,
+    address _targetAsset
+) external returns (address vault);
 ```
 
 ### Collateral amount <a href="#collateral-amount" id="collateral-amount"></a>
 
-The borrower can add collateral with the following functions:
+Only the current `borrower` of the collateral vault can add or remove collateral. For Aave V3 vaults the collateral asset is an ERC20 that wraps Aave `aTokens`; for Euler vaults it is an `eToken`. Vaults also accepts the raw underlying (e.g. WETH) through `depositUnderlying`.
 
 ```solidity
-/// @notice Deposits a certain amount of collateral asset
-/// @param assets The assets to deposit.
+/// @notice Deposits the collateral vault's asset (the wrapped aToken / eToken).
 function deposit(uint assets) external;
 
-/// @notice Deposits a certain amount of underlying asset
-/// @param underlying The underlying assets to deposit.
+/// @notice Deposits the underlying of the collateral asset (e.g., WETH). The vault wraps it before storing.
 function depositUnderlying(uint underlying) external;
 
-/// @notice allow users of the underlying protocol to seamlessly transfer their position to this vault
-function teleport(uint toDeposit, uint toBorrow) external;
+/// @notice After an airdrop of the collateral asset, skim the idle balance into the accounted position.
+///         Mainly used as the last step of a 1-click leverage batch.
+function skim() external;
 ```
 
-Only the collateral vault owner, the borrower, can call these functions.&#x20;
+* `deposit(...)` pulls the already-wrapped collateral asset (e.g. `aWETHWrapper` or `eWETH`) from the borrower.
+* `depositUnderlying(...)` pulls the bare underlying (e.g. `WETH`) and wraps it inside the vault.
+* `skim()` is what leverage operators rely on: they airdrop wrapper shares to the collateral vault after supplying the flash-loaned amount to the external market, then call `skim()` inside the borrower's EVC batch so the airdropped balance is added to `totalAssetsDepositedOrReserved`.
 
-* `deposit(...)` allows the borrower to deposit the collateral vault asset (such as aWETH or eWETH) into the vault.
-* `depositUnderlying(...)` allows the borrower to deposit WETH directly to the vault, bypassing the need to deposit into another protocol first.
-* `teleport(uint,uint)` is used to allow quick transfer of a position from another protocol that includes an existing borrow, without requiring the borrower to unwind their borrow. These actions use the ERC20 `transferFrom()` function call, so an approval or Permit2 signature is necessary for them to function properly.
-
-The borrower can remove collateral, as long as it is not being used for a borrow, with:
+The borrower can remove collateral, as long as it doesn't make the vault liquidatable, with:
 
 ```solidity
 /// @notice Withdraws a certain amount of assets for a receiver.

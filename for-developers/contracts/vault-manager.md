@@ -1,6 +1,6 @@
 # Vault Manager
 
-The Twyne Vault Manager manages global Twyne parameters, including: allowed assets, allowed liquidation LTVs, addresses of key components (such as the oracle router), safety buffer (aka external liquidation buffer) and other governance configuration parameters. This contract will be owned by the Twyne multisig.
+The Twyne Vault Manager manages global Twyne parameters, including: allowed intermediate vaults, allowed liquidation LTVs, addresses of key components (such as the oracle router), safety buffer (aka external liquidation buffer) and other governance configuration parameters. This contract is owned by the Twyne multisig.
 
 There are no user-facing functions in this contract, all state-modifying functions are admin controlled. Some view functions may be useful for protocols or bots integrating with Twyne.
 
@@ -8,7 +8,7 @@ There are no user-facing functions in this contract, all state-modifying functio
 
 ### Set oracle <a href="#set-oracle" id="set-oracle"></a>
 
-Sets the oracle used by Twyne collateral vaults.
+Sets the oracle router used by Twyne collateral vaults.
 
 ```solidity
 /// @notice Set oracleRouter address. Governance-only.
@@ -17,145 +17,121 @@ function setOracleRouter(address _oracle) external onlyOwner;
 
 ### Whitelist intermediate vault <a href="#whitelist-intermediate-vault" id="whitelist-intermediate-vault"></a>
 
-Intermediate vaults are deployed by Twyne governance. A new intermediate vault can be added to Twyne’s onchain system via:
+Intermediate vaults are deployed by Twyne governance. They are registered with the Vault Manager via:
 
 ```solidity
-/// @notice Set a collateral vault's intermediate vault. Governance-only.
+/// @notice Register or unregister an intermediate vault. Governance-only.
 /// @param _intermediateVault address of the intermediate vault.
-function setIntermediateVault(IEVault _intermediateVault) external onlyOwner;
+/// @param _value true to register, false to unregister.
+function setIntermediateVault(IEVault _intermediateVault, bool _value) external onlyOwner;
 ```
 
-It adds the intermediate vault to this mapping:
-
-```solidity
-mapping(address collateralAddress => address intermediateVault) internal intermediateVaults;
-```
+Only whitelisted intermediate vaults can be used when creating collateral vaults.
 
 ### Whitelist target vault <a href="#whitelist-target-vault" id="whitelist-target-vault"></a>
 
-Collateral vaults are deployed with an intermediate and target vault. Collateral vaults reserve credit from intermediate vault and borrows from target vault. For each intermediate vault, `VaultManager` maintains a list of target vaults. Thus, a collateral vault can be deployed only when its intermediate and target vault is whitelisted.
+Every collateral vault is tied to a single intermediate vault and a single target (external) vault. Governance maintains an allowlist of `(intermediate, target)` pairs:
 
 ```solidity
-/// @notice Set an allowed target vault for a specific intermediate vault. Governance-only.
-/// @param _intermediateVault address of the intermediate vault.
-/// @param _targetVault The target vault that should be allowed for the intermediate vault.
+/// @notice Allow a target vault to be used with a specific intermediate vault. Governance-only.
 function setAllowedTargetVault(address _intermediateVault, address _targetVault) external onlyOwner;
-```
 
-It adds the target vault to this mapping:
-
-```solidity
-mapping(address collateralAddress => address intermediateVault) internal intermediateVaults;
-```
-
-### Remove target vault from whitelist <a href="#remove-target-vault-from-whitelist" id="remove-target-vault-from-whitelist"></a>
-
-Removes the target vault from the whitelist for a particular intermediate vault. This blocks creation of collateral vaults which uses this specific intermediate vault and target vault pair.
-
-```solidity
-/// @notice Remove an allowed target vault for a specific intermediate vault. Governance-only.
-/// @param _intermediateVault address of the intermediate vault.
-/// @param _targetVault The target vault that should be allowed for the intermediate vault.
-/// @param _index The index at which this _targetVault is stored in `allowedTargetVaultList`.
+/// @notice Remove an existing target vault from the allowlist. Governance-only.
+/// @param _index The position of _targetVault inside allowedTargetVaultList[_intermediateVault].
 function removeAllowedTargetVault(address _intermediateVault, address _targetVault, uint _index) external onlyOwner;
 ```
 
-It removes the target vault from this mapping:
+### Whitelist target asset (Aave-style targets) <a href="#whitelist-target-asset" id="whitelist-target-asset"></a>
+
+For integrations where a single target vault can be used to borrow multiple assets (e.g., the Aave V3 Pool), governance additionally whitelists each borrowable asset:
 
 ```solidity
-mapping(address collateralAddress => address intermediateVault) internal intermediateVaults;
+/// @notice Allow a target asset to be borrowed from a target vault. Governance-only.
+function setAllowedTargetAsset(
+    address _intermediateVault,
+    address _targetVault,
+    address _targetAsset
+) external onlyOwner;
 ```
 
-Note that existing collateral vaults using this pair will continue functioning normally.
+`CollateralVaultFactory.createCollateralVault` uses `isAllowedTargetAssets` to gate Aave V3 collateral vault creation.
 
 ### Set maximum liquidation LTV <a href="#set-maximum-liquidation-ltv" id="set-maximum-liquidation-ltv"></a>
 
-Every borrower can set a liquidation LTV for its collateral vault. A range check is performed on this value to ensure Twyne works correctly. The upper bound of this range is set by:
+Every borrower picks a liquidation LTV for their collateral vault. The protocol-wide upper bound is set per-intermediate-vault:
 
 ```solidity
-/// @notice Set protocol-wide maxTwyneLiqLTV. Governance-only.
-/// @param _ltv new maxTwyneLiqLTV value.
-function setMaxLiquidationLTV(address _collateralAddress, uint16 _ltv) external onlyOwner;
+/// @notice Set maxTwyneLiqLTV for an intermediate vault with an optional linear ramp-down. Governance-only.
+/// @param _intermediateVault address of the intermediate vault.
+/// @param _ltv new target maxTwyneLiqLTV (1e4 precision).
+/// @param _rampDuration ramp duration in seconds. 0 for immediate update. If > 0, `_ltv` must be strictly lower
+///        than the current effective value; the current value is snapshotted as the ramp start.
+function setMaxLiquidationLTV(address _intermediateVault, uint16 _ltv, uint32 _rampDuration) external onlyOwner;
 ```
 
-It updates the maximum liquidation LTV stored in this mapping:
+The current effective value is read via:
 
 ```solidity
-mapping(address collateralAddress => uint16 maxTwyneLiqLTV) public maxTwyneLTVs;
+function maxTwyneLTVs(address _intermediateVault) external view returns (uint16);
 ```
 
 ### Set external liquidation buffer <a href="#set-external-liquidation-buffer" id="set-external-liquidation-buffer"></a>
 
-The lower bound on the user-specified liquidation LTV is given by: liqLTVe∗extLiqBuffer
-
-Where liqLTVe is the external lending market’s liquidation LTV, and extLiqBuffer is value between 0 and 1. Realistically, this buffer will vary from 0.9 to 1.
-
-This buffer can be set for each collateral asset via:
+The lower bound of the user-chosen liquidation LTV is `externalLiqLTV * externalLiqBuffer`, where `externalLiqBuffer ∈ (0, 1e4]` provides the safety margin below the underlying protocol's liquidation threshold. It too supports linear ramp-down:
 
 ```solidity
-/// @notice Set protocol-wide externalLiqBuffer. Governance-only.
-/// @param _liqBuffer new externalLiqBuffer value.
-function setExternalLiqBuffer(address _collateralAddress, uint16 _liqBuffer) external onlyOwner;
+/// @notice Set externalLiqBuffer for an intermediate vault with an optional linear ramp-down. Governance-only.
+function setExternalLiqBuffer(address _intermediateVault, uint16 _liqBuffer, uint32 _rampDuration) external onlyOwner;
+
+function externalLiqBuffers(address _intermediateVault) external view returns (uint16);
+```
+
+Ramp metadata (start value, target, duration) is exposed via `maxTwyneLTVFull(...)` and `externalLiqBufferFull(...)` for monitoring.
+
+### Set LTV parameters on the intermediate vault <a href="#set-ltv-parameters-for-intermediate-vaults" id="set-ltv-parameters-for-intermediate-vaults"></a>
+
+At creation time, `CollateralVaultFactory` configures the newly deployed collateral vault as a collateral inside its intermediate vault. This goes through the Vault Manager:
+
+```solidity
+/// @notice Set new LTV values for an intermediate vault by calling EVK.setLTV().
+///         Callable by governance or the collateral vault factory.
+function setLTV(
+    IEVault _intermediateVault,
+    address _collateralVault,
+    uint16 _borrowLimit,
+    uint16 _liquidationLimit,
+    uint32 _rampDuration
+) external onlyCollateralVaultFactoryOrOwner;
+```
+
+The factory always calls this with `(1e4, 1e4, 0)`. That is safe because the intermediate vault is not permitted to liquidate the collateral vault during normal operation — `IEVault.liquidate(...)` is only enabled as a bad-debt-settlement step after an external liquidation has been handled.
+
+### Set resolved vault on the oracle router <a href="#set-resolved-vault" id="set-resolved-vault"></a>
+
+Each collateral vault must be priced by the oracle router. The factory configures this via:
+
+```solidity
+function setOracleResolvedVault(address _vault, bool _allow) external onlyCollateralVaultFactoryOrOwner;
+
+/// @notice Variant used for Aave V3 collateral vaults, where a different oracle router may be wired up.
+function setOracleResolvedVaultForOracleRouter(
+    address _oracleRouter,
+    address _vault,
+    bool _allow
+) external onlyCollateralVaultFactoryOrOwner;
 ```
 
 ### Set collateral vault factory <a href="#set-collateral-vault-factory" id="set-collateral-vault-factory"></a>
 
-Anyone can deploy collateral vaults via the collateral vault factory. Twyne governance can change the factory address via:
-
 ```solidity
-/// @notice Set new collateralVaultFactory address. Governance-only.
-/// @param _factory new collateralVaultFactory address.
-function setCollateralVaultFactory(address _factory) external;
+function setCollateralVaultFactory(address _factory) external onlyOwner;
 ```
 
 ### Arbitrary external call <a href="#arbitrary-external-call" id="arbitrary-external-call"></a>
 
-`VaultManager` can do an arbitrary external call via:
+`VaultManager` is the owner/admin of many contracts in the Twyne system. To avoid having to ship a new manager for every one-off admin operation it exposes:
 
 ```solidity
 /// @notice Perform an arbitrary external call. Governance-only.
-/// @dev VaultManager is an owner/admin of many contracts in the Twyne system.
-/// @dev This function helps Governance in case a specific a specific external function call was not implemented.
 function doCall(address to, uint value, bytes memory data) external payable onlyOwner;
-```
-
-Note the actions performed by Twyne governance is still limited by the callee smart contract.
-
-### Set LTV parameters for intermediate vaults <a href="#set-ltv-parameters-for-intermediate-vaults" id="set-ltv-parameters-for-intermediate-vaults"></a>
-
-The collateral vault factory, at the time of collateral vault creation, sets LTV parameters under which the collateral vault can borrow from its intermediate vault:
-
-```solidity
-vaultManager.setLTV(IEVault(intermediateVault), vault, 1e4, 1e4, 0);
-```
-
-This operation is done via `VaultManager.setLTV(...)`:
-
-```solidity
-/// @notice Set new LTV values for an intermediate vault by calling EVK.setLTV(). Callable by governance or collateral vault factory.
-/// @param _intermediateVault address of the intermediate vault.
-/// @param _collateralVault address of the collateral vault.
-/// @param _borrowLimit new borrow LTV.
-/// @param _liquidationLimit new liquidation LTV.
-/// @param _rampDuration ramp duration in seconds (0 for immediate effect) during which the liquidation LTV will change.
-function setLTV(IEVault _intermediateVault, address _collateralVault, uint16 _borrowLimit, uint16 _liquidationLimit, uint32 _rampDuration) external onlyCollateralVaultFactoryOrOwner;
-```
-
-### Set resolved vault <a href="#set-resolved-vault" id="set-resolved-vault"></a>
-
-Each collateral vault at the time of its deployment signals the oracle router that it needs to price it:
-
-```solidity
-vaultManager.setOracleResolvedVault(vault, true);
-```
-
-This operation is done via:
-
-```solidity
-/// @notice Set new oracleRouter resolved vault value. Callable by governance or collateral vault factory.
-/// @param _vault EVK or collateral vault address. Must implement `convertToAssets()`.
-/// @param _allow bool value to pass to govSetResolvedVault. True to configure the vault, false to clear the record.
-/// @dev called by createCollateralVault() when a new collateral vault is created so collateral can be price properly.
-/// @dev Configures the collateral vault to use internal pricing via `convertToAssets()`.
-function setOracleResolvedVault(address _vault, bool _allow) external onlyCollateralVaultFactoryOrOwner;
 ```

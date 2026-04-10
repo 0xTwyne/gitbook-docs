@@ -167,7 +167,7 @@ In this scenario, the borrowed amount exceeds what's allowed by the Twyne LTV, m
 # Parameters
 user_collateral = 1.0     # 1.0 ETH
 reserved_credit = 0.26    # 0.26 ETH
-borrowed_amount = 1.1     # 0.95 ETH (exceeds External limit)
+borrowed_amount = 1.1     # 1.1 ETH (exceeds both limits)
 twyne_liq_ltv = 0.85      # 85%
 ext_lending_liq_ltv = 0.75    # 75%
 safety_buffer = 0.95      # 95%
