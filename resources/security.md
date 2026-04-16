@@ -26,10 +26,12 @@ All our upgrades go through audits and are covered under Immunefi bug bounty.
 
 * yAudit: [report](https://reports.yaudit.dev/2025-12-Twyne-liquidation-incentive).
 
-#### Dynamic LLTV (soon) <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
+#### Dynamic LLTV <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
 
-* yAudit: report.
-* Josselin Feist (SecEureka):
+* yAudit: report: [report](https://reports.yaudit.dev/2026-02-Twyne-2026-Q1).
+* Josselin Feist (SecEureka) - matches the latest commit on [twyne-contracts-v1](https://github.com/0xTwyne/twyne-contracts-v1/tree/0aa37b02fca27025a049daf0d7ec31b94f1810eb):
+
+{% file src="../.gitbook/assets/Twyne PRs review (April 13th).pdf" %}
 
 ### Bug Bounty with Immunefi <a href="#reporting-security-vulnerabilities" id="reporting-security-vulnerabilities"></a>
 
