@@ -183,7 +183,7 @@ print(f"Twyne condition met: {result['twyne_condition_met']}")
 print(f"External condition met: {result['external_condition_met']}")
 # Position is healthy: False
 # Twyne condition met: False
-# External condition met: True
+# External condition met: False
 ```
 
 In this scenario, the borrowed amount exceeds both Twyne and external limits, making the position externally liquidatable.

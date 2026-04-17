@@ -7,7 +7,7 @@ Twyne is currently deployed only to Ethereum mainnet. The key contract addresses
 | Intermediate Vault Factory | [0xB5Eb1d005e389Bef38161691E2083b4d86FF647a](https://etherscan.io/address/0xB5Eb1d005e389Bef38161691E2083b4d86FF647a) |
 | Collateral Vault Factory   | [0xa1517cCe0bE75700A8838EA1cEE0dc383cd3A332](https://etherscan.io/address/0xa1517cCe0bE75700A8838EA1cEE0dc383cd3A332) |
 | Vault Manager              | [0x0acd3A3c8Ab6a5F7b5A594C88DFa28999dA858aC](https://etherscan.io/address/0x0acd3A3c8Ab6a5F7b5A594C88DFa28999dA858aC) |
-| Health Stats Viewer        | [0x0dd9065c998E75657BcE6C3a11d7F5AbA5CBdbD4](https://etherscan.io/address/0x0dd9065c998E75657BcE6C3a11d7F5AbA5CBdbD4) |
+| Health Stats Viewer        | [0xe3632980F6D1a405211eAA698c125E4f3753337e](https://etherscan.io/address/0xe3632980F6D1a405211eAA698c125E4f3753337e) |
 
 ### Euler integration
 
