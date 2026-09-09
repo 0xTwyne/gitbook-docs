@@ -33,6 +33,10 @@ All our upgrades go through audits and are covered under Immunefi bug bounty.
 
 {% file src="../.gitbook/assets/Twyne PRs review (April 13th).pdf" %}
 
+### Morpho Integration <a href="#morpho" id="morpho"></a>
+
+* yAudit: [report](https://reports.yaudit.dev/2026-08-twyne-morpho-vault).
+
 ## Bug Bounty with Immunefi <a href="#bug-bounty-with-immunefi" id="bug-bounty-with-immunefi"></a>
 
 All details here: [immunefi.com/bug-bounty/twyne](https://immunefi.com/bug-bounty/twyne/).
