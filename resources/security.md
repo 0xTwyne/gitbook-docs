@@ -33,6 +33,12 @@ All our upgrades go through audits and are covered under Immunefi bug bounty.
 
 {% file src="../.gitbook/assets/Twyne PRs review (April 13th).pdf" %}
 
+### Dynamic LLTV <a href="#dynamic-lltv" id="dynamic-lltv"></a>
+
+* yAudit
+
+{% file src="../.gitbook/assets/2026-08-Twyne---Morpho-Vault-report.pdf" %}
+
 ## Bug Bounty with Immunefi <a href="#bug-bounty-with-immunefi" id="bug-bounty-with-immunefi"></a>
 
 All details here: [immunefi.com/bug-bounty/twyne](https://immunefi.com/bug-bounty/twyne/).
