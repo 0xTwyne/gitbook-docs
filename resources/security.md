@@ -33,7 +33,7 @@ All our upgrades go through audits and are covered under Immunefi bug bounty.
 
 {% file src="../.gitbook/assets/Twyne PRs review (April 13th).pdf" %}
 
-### Dynamic LLTV <a href="#dynamic-lltv" id="dynamic-lltv"></a>
+### Morpho Integration <a href="#morpho" id="morpho"></a>
 
 * yAudit
 
